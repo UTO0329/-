@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>底値メモ＆家計簿ツール</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body { font-family: sans-serif; background-color: #f4f7f6; padding: 15px; margin: 0; color: #333; }
+    .container { max-width: 900px; margin: 0 auto; background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    
+    .header-area { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;}
+    .header-area h1 { margin: 0; font-size: 20px; }
+    .daily-total-badge { background-color: #2c3e50; color: #ffffff; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 8px; }
+    .header-graph-btn { background: #3498db; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold; }
+    .header-graph-btn:hover { background: #2980b9; }
+
+    .section-box { background-color: #f8f9fa; border: 1px dashed #3498db; border-radius: 6px; padding: 12px 15px; margin-bottom: 15px; }
+    .section-box.edit-mode { border-color: #e67e22; background-color: #fffcf8; }
+    .section-box h3 { margin: 0 0 8px 0; font-size: 14px; color: #2c3e50; display: flex; align-items: center; justify-content: space-between; }
+    
+    .row-flex { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    select, input[type="text"], input[type="date"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
+    
+    .fav-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
+    .fav-chip { background: #e8f4fc; border: 1px solid #3498db; color: #2980b9; padding: 5px 10px; border-radius: 15px; font-size: 12px; font-weight: bold; cursor: pointer; user-select: none; display: inline-flex; align-items: center; gap: 4px; }
+    .fav-chip:hover { background: #3498db; color: #fff; }
+    .fav-chip .dismiss-btn { opacity: 0.6; font-size: 11px; padding: 0 2px; }
+    .fav-chip .dismiss-btn:hover { opacity: 1; color: #e74c3c; }
+    .fav-chip-edit { background: #fdf2e9; border-color: #e67e22; color: #d35400; }
+    .fav-chip-edit .perm-delete-btn { background: #e74c3c; color: white; border-radius: 10px; padding: 1px 6px; font-size: 10px; margin-left: 4px; }
+
+    .date-row { margin-bottom: 12px; display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 14px; }
+    .items-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .item-row { display: flex; gap: 8px; align-items: center; background: #fafafa; padding: 8px; border-radius: 4px; border: 1px solid #eee; flex-wrap: wrap;}
+    
+    .item-row .name-input { flex: 2; min-width: 120px; }
+    .item-row .price-input { flex: 1; min-width: 70px; }
+    .item-row .cap-input { flex: 1; min-width: 70px; }
+    .item-row .cat-select { flex: 1; min-width: 90px; }
+
+    .btn { padding: 8px 12px; border: none; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; text-align: center; }
+    .btn-primary { background-color: #3498db; color: white; }
+    .btn-primary:hover { background-color: #2980b9; }
+    .btn-secondary { background-color: #2ecc71; color: white; }
+    .btn-warning { background-color: #f39c12; color: white; }
+    .btn-danger { background-color: #e74c3c; color: white; }
+    .btn-outline { background-color: #ffffff; color: #333; border: 1px solid #ccc; }
+    .btn-outline:hover { background-color: #eee; }
+
+    .result-area { margin-top: 15px; padding: 12px 15px; border-radius: 6px; background-color: #eef2f5; line-height: 1.6; }
+    .result-title { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
+    .result-detail { font-size: 13px; color: #444; }
+
+    .badge-bottom { background-color: #e74c3c; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; display: inline-block; margin-left: 4px; }
+    .badge-inflation-up { color: #e74c3c; font-weight: bold; font-size: 11px; }
+    .badge-inflation-down { color: #27ae60; font-weight: bold; font-size: 11px; }
+    
+    .filter-bar { background-color: #eef2f5; padding: 10px 12px; border-radius: 6px; margin-top: 20px; margin-bottom: 10px; }
+    .summary-card { background: #2c3e50; color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: bold; margin-top: 8px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 5px; }
+
+    .date-block { margin-top: 10px; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden; }
+    .date-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #ffffff; border-bottom: 1px solid #eee; font-weight: bold; font-size: 13px; cursor: pointer; user-select: none; transition: background 0.2s; }
+    .date-header:hover { background: #f0f4f8; }
+    .date-body { padding: 10px; overflow-x: auto; }
+    
+    table { width: 100%; border-collapse: collapse; font-size: 13px; background: #ffffff; min-width: 420px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    th { background-color: #f8f9fa; }
+    .action-btn { padding: 3px 6px; font-size: 11px; margin-right: 2px; }
+
+    .history-item-name { color: #2980b9; cursor: pointer; text-decoration: underline; font-weight: bold; }
+    .history-item-name:hover { color: #e74c3c; }
+
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+    .modal-content { background: white; padding: 20px; border-radius: 8px; width: 92%; max-width: 650px; position: relative; max-height: 90vh; overflow-y: auto;}
+    .close-btn { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: #777; }
+    .edit-form-group { margin-bottom: 12px; }
+    .edit-form-group label { display: block; font-weight: bold; font-size: 12px; margin-bottom: 4px; }
+    .edit-form-group input, .edit-form-group select { width: 100%; }
+  </style>
+</head>
+<body>
+  <datalist id="product-suggestions"></datalist>
+
+  <div class="container">
+    <div class="header-area">
+      <h1>底値メモ＆家計簿</h1>
+      <div class="row-flex">
+        <button class="header-graph-btn" onclick="openTotalExpenseGraphModal()">📊 月別支出トータル</button>
+        <div id="daily-total-badge" class="daily-total-badge">選択日: 0 円</div>
+      </div>
+    </div>
+
+    <!-- お気に入り -->
+    <div id="fav-section-box" class="section-box" style="border-color: #2ecc71; background-color: #f4fbf7;">
+      <h3>
+        <span id="fav-box-title">⭐ よく買うもの（タップで入力追加）</span>
+        <button id="toggle-fav-manage-btn" class="btn btn-outline" style="padding: 2px 8px; font-size: 11px;">編集</button>
+      </h3>
+      <div id="fav-chips-container" class="fav-chips"></div>
+      <div id="fav-manage-form" style="display: none; margin-top: 10px; border-top: 1px dashed #e67e22; padding-top: 8px;">
+        <div class="row-flex">
+          <input type="text" id="new-fav-name" placeholder="新しいよく買うもの" style="flex:1;">
+          <button id="add-fav-btn" class="btn btn-secondary">追加</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- レシピ -->
+    <div class="section-box">
+      <h3>🍳 レシピから具材を呼び出し</h3>
+      <div class="row-flex">
+        <select id="recipe-select" style="flex: 2; min-width: 130px;"></select>
+        <button id="load-recipe-btn" class="btn btn-secondary">セット</button>
+        <button id="edit-recipe-btn" class="btn btn-warning" style="display: none;">編集</button>
+        <button id="delete-recipe-btn" class="btn btn-danger" style="display: none;">削除</button>
+        <button id="toggle-add-recipe-btn" class="btn btn-outline">＋ 新規登録</button>
+      </div>
+      <div id="recipe-form" style="display: none; margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px;">
+        <input type="hidden" id="editing-recipe-name" value="">
+        <div class="row-flex" style="margin-bottom: 8px;">
+          <input type="text" id="recipe-title" placeholder="レシピ名" style="flex:1;">
+          <input type="text" id="recipe-ingredients" placeholder="具材をカンマ区切り" style="flex:2;">
+        </div>
+        <div class="row-flex">
+          <button id="save-recipe-btn" class="btn btn-primary">保存</button>
+          <button id="cancel-recipe-btn" class="btn btn-outline">キャンセル</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 入力フォーム -->
+    <div class="date-row">
+      <label for="date">購入日:</label>
+      <input type="date" id="date">
+    </div>
+
+    <div id="items-container" class="items-container"></div>
+
+    <div class="row-flex" style="margin-top: 10px;">
+      <button id="add-row-btn" class="btn btn-outline">＋ 行を追加</button>
+      <button id="save-all-btn" class="btn btn-primary" style="flex: 1;">一括で記録・価格比較</button>
+    </div>
+
+    <div id="result" class="result-area">
+      <div class="result-title">商品情報を入力して「一括で記録」を押してください</div>
+      <div id="result-detail" class="result-detail"></div>
+    </div>
+
+    <!-- 履歴フィルター -->
+    <div class="filter-bar">
+      <div class="row-flex" style="justify-content: space-between;">
+        <div style="font-weight: bold; font-size: 14px;">🔍 履歴の絞り込み・検索</div>
+        <div class="row-flex">
+          <select id="history-month-filter"><option value="">全期間表示</option></select>
+          <input type="text" id="history-search-input" placeholder="品名で検索..." style="width: 140px;">
+        </div>
+      </div>
+      <div class="summary-card">
+        <span id="summary-filter-label">表示中データ集計:</span>
+        <span id="summary-filter-stats">0 円 (0件)</span>
+      </div>
+    </div>
+
+    <!-- 階層折りたたみ履歴表示 -->
+    <div id="history-hierarchical"></div>
+
+    <!-- バックアップ・CSV -->
+    <div class="section-box" style="margin-top: 40px; border-color:#ccc; background:#fff;">
+      <h3>💾 データのバックアップとCSV出力</h3>
+      <div class="row-flex">
+        <button id="export-data-btn" class="btn btn-outline">⬇️ JSONバックアップ</button>
+        <button id="export-csv-btn" class="btn btn-secondary">📊 CSVダウンロード(Excel用)</button>
+        <label class="btn btn-outline" style="cursor:pointer; margin:0;">
+          ⬆️ 復元
+          <input type="file" id="import-data-file" accept=".json" style="display:none;">
+        </label>
+        <button id="clear-all-data-btn" class="btn btn-danger" style="margin-left:auto;">全消去</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- グラフモーダル -->
+  <div id="graph-modal" class="modal">
+    <div class="modal-content">
+      <span id="close-graph-modal" class="close-btn">&times;</span>
+      <div id="graph-modal-header" style="margin-bottom: 10px;"></div>
+      <h3 id="graph-modal-title" style="margin-top:0; font-size: 16px;">グラフ表示</h3>
+      <div id="graph-filter-container" style="margin-bottom: 10px; display: none;"></div>
+      <canvas id="price-chart"></canvas>
+      <div id="graph-legend-info" style="margin-top: 10px; font-size: 12px; color: #555; text-align: center;"></div>
+    </div>
+  </div>
+
+  <!-- 編集モーダル -->
+  <div id="edit-modal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+      <span id="close-edit-modal" class="close-btn">&times;</span>
+      <h3 style="margin-top:0; border-bottom: 2px solid #3498db; padding-bottom: 8px;">データの修正</h3>
+      <input type="hidden" id="edit-target-index">
+      <div class="edit-form-group"><label>日付</label><input type="date" id="edit-date"></div>
+      <div class="edit-form-group"><label>品名</label><input type="text" id="edit-name" list="product-suggestions"></div>
+      <div class="edit-form-group"><label>カテゴリ</label>
+        <select id="edit-cat">
+          <option value="食費">食費</option>
+          <option value="日用品">日用品</option>
+          <option value="その他">その他</option>
+        </select>
+      </div>
+      <div class="edit-form-group"><label>価格(円)</label><input type="text" inputmode="numeric" id="edit-price"></div>
+      <div class="edit-form-group"><label>内容量</label><input type="text" inputmode="numeric" id="edit-capacity"></div>
+      <div class="row-flex" style="margin-top: 20px;">
+        <button id="update-record-btn" class="btn btn-primary" style="flex:1;">保存</button>
+        <button id="cancel-edit-btn" class="btn btn-outline">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const defaultRecipes = { "カレー": ["カレールー", "玉ねぎ", "人参", "じゃがいも", "豚肉"], "肉じゃが": ["豚肉", "じゃがいも", "玉ねぎ", "人参"] };
+    const defaultFavorites = ["牛乳", "卵", "食パン", "豆腐", "納豆", "豚肉", "玉ねぎ", "人参"];
+
+    let chartInstance = null;
+    let isFavEditMode = false;
+    let currentGraphNormName = '';
+    let currentGraphDisplayName = '';
+
+    const dateInput = document.getElementById('date');
+    dateInput.valueAsDate = new Date();
+
+    function initApp() {
+      initRecipes();
+      renderFavorites();
+      updateDatalist();
+      if(document.getElementById('items-container').children.length === 0) addItemRow();
+      populateMonthFilterOptions();
+      refreshUI();
+    }
+    
+    function refreshUI() {
+      displayHierarchicalHistory();
+      updateDailyTotal();
+      updateDatalist();
+    }
+
+    dateInput.addEventListener('change', () => {
+      updateDailyTotal();
+      displayHierarchicalHistory();
+    });
+
+    // --- お気に入り管理 ---
+    function getStoredFavorites() {
+      const saved = localStorage.getItem('favoriteItems');
+      return saved ? JSON.parse(saved) : defaultFavorites;
+    }
+    function getTodayDismissedFavs() {
+      const today = new Date().toISOString().slice(0, 10);
+      const stored = JSON.parse(localStorage.getItem('dismissedFavsDateData') || '{}');
+      if (stored.date !== today) {
+        localStorage.setItem('dismissedFavsDateData', JSON.stringify({ date: today, list: [] }));
+        return [];
+      }
+      return stored.list || [];
+    }
+    function addTodayDismissedFav(name) {
+      const today = new Date().toISOString().slice(0, 10);
+      const list = getTodayDismissedFavs();
+      if (!list.includes(name)) {
+        list.push(name);
+        localStorage.setItem('dismissedFavsDateData', JSON.stringify({ date: today, list }));
+      }
+    }
+    function renderFavorites() {
+      const favs = getStoredFavorites();
+      const dismissed = getTodayDismissedFavs();
+      const container = document.getElementById('fav-chips-container');
+      
+      if (isFavEditMode) {
+        container.innerHTML = favs.map(name => `
+          <span class="fav-chip fav-chip-edit">${escapeHTML(name)}
+            <span class="perm-delete-btn" onclick="deleteFavoritePermanently('${escapeHTML(name)}')">🗑️ 削除</span>
+          </span>
+        `).join('');
+      } else {
+        const visibleFavs = favs.filter(name => !dismissed.includes(name));
+        container.innerHTML = visibleFavs.map(name => `
+          <span class="fav-chip" onclick="addItemRow('${escapeHTML(name)}')">＋ ${escapeHTML(name)}
+            <span class="dismiss-btn" onclick="event.stopPropagation(); dismissFavoriteToday('${escapeHTML(name)}')" title="今日だけ隠す">✕</span>
+          </span>
+        `).join('');
+      }
+    }
+    function dismissFavoriteToday(name) { addTodayDismissedFav(name); renderFavorites(); }
+    function deleteFavoritePermanently(name) {
+      if (!confirm(`「${name}」をよく買うものから削除しますか？`)) return;
+      let favs = getStoredFavorites().filter(item => item !== name);
+      localStorage.setItem('favoriteItems', JSON.stringify(favs));
+      renderFavorites();
+      updateDatalist();
+    }
+    document.getElementById('toggle-fav-manage-btn').onclick = () => {
+      isFavEditMode = !isFavEditMode;
+      const box = document.getElementById('fav-section-box');
+      const form = document.getElementById('fav-manage-form');
+      const btn = document.getElementById('toggle-fav-manage-btn');
+      if (isFavEditMode) {
+        box.classList.add('edit-mode'); form.style.display = 'block'; btn.textContent = '完了'; btn.className = 'btn btn-warning';
+      } else {
+        box.classList.remove('edit-mode'); form.style.display = 'none'; btn.textContent = '編集'; btn.className = 'btn btn-outline';
+      }
+      renderFavorites();
+    };
+    document.getElementById('add-fav-btn').onclick = () => {
+      const input = document.getElementById('new-fav-name');
+      const name = input.value.trim();
+      if(!name) return;
+      const favs = getStoredFavorites();
+      if(!favs.includes(name)) {
+        favs.push(name);
+        localStorage.setItem('favoriteItems', JSON.stringify(favs));
+        renderFavorites();
+        updateDatalist();
+      }
+      input.value = '';
+    };
+
+    function updateDatalist() {
+      const history = getStoredHistory();
+      const favs = getStoredFavorites();
+      const set = new Set([...favs, ...history.map(i => i.name)]);
+      document.getElementById('product-suggestions').innerHTML = Array.from(set).map(name => `<option value="${escapeHTML(name)}">`).join('');
+    }
+
+    // --- 入力行追加 ---
+    function addItemRow(name = '', price = '', capacity = '', category = '食費') {
+      const container = document.getElementById('items-container');
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML = `
+        <input type="text" class="name-input" list="product-suggestions" placeholder="品名" value="${escapeHTML(name)}" oninput="onItemNameInput(this)">
+        <select class="cat-select">
+          <option value="食費" ${category==='食費'?'selected':''}>食費</option>
+          <option value="日用品" ${category==='日用品'?'selected':''}>日用品</option>
+          <option value="その他" ${category==='その他'?'selected':''}>その他</option>
+        </select>
+        <input type="text" inputmode="numeric" class="price-input" placeholder="価格(円)" value="${escapeHTML(price)}">
+        <input type="text" inputmode="numeric" class="cap-input" placeholder="量" value="${escapeHTML(capacity)}">
+        <button class="btn btn-danger" style="padding: 6px 10px;" onclick="removeRow(this)">✕</button>
+      `;
+      container.appendChild(row);
+      if (name) autoFillPreviousData(row, name);
+    }
+
+    function removeRow(btn) {
+      const container = document.getElementById('items-container');
+      if (container.children.length > 1) btn.closest('.item-row').remove();
+      else alert('最低1行は必要です。');
+    }
+    document.getElementById('add-row-btn').addEventListener('click', () => addItemRow());
+
+    function onItemNameInput(inputEl) {
+      const row = inputEl.closest('.item-row');
+      const name = inputEl.value.trim();
+      if (!name) return;
+
+      const norm = normalizeText(name);
+      const catSelect = row.querySelector('.cat-select');
+      if (norm.includes('洗剤') || norm.includes('ペーパー') || norm.includes('ティッシュ') || norm.includes('シャンプー')) {
+        catSelect.value = '日用品';
+      } else if (norm.includes('電池') || norm.includes('文房具')) {
+        catSelect.value = 'その他';
+      } else {
+        catSelect.value = '食費';
+      }
+      autoFillPreviousData(row, name);
+    }
+
+    function autoFillPreviousData(row, name) {
+      const history = getStoredHistory();
+      const norm = normalizeText(name);
+      const matches = history.filter(i => i.normalizedName === norm).sort((a,b) => new Date(b.date) - new Date(a.date));
+      if (matches.length > 0) {
+        const last = matches[0];
+        if (!row.querySelector('.cap-input').value) row.querySelector('.cap-input').value = last.capacity;
+        if (last.category) row.querySelector('.cat-select').value = last.category;
+      }
+    }
+
+    // --- レシピ ---
+    function getStoredRecipes() {
+      const saved = localStorage.getItem('customRecipes');
+      return saved ? JSON.parse(saved) : { ...defaultRecipes };
+    }
+    function saveRecipes(recipes) { localStorage.setItem('customRecipes', JSON.stringify(recipes)); initRecipes(); }
+    function initRecipes() {
+      const select = document.getElementById('recipe-select');
+      const currentVal = select.value;
+      select.innerHTML = '<option value="">-- レシピを選択 --</option>';
+      for (const name in getStoredRecipes()) {
+        const opt = document.createElement('option'); opt.value = name; opt.textContent = name;
+        select.appendChild(opt);
+      }
+      select.value = currentVal;
+      updateRecipeButtonsState();
+    }
+    document.getElementById('recipe-select').onchange = updateRecipeButtonsState;
+    function updateRecipeButtonsState() {
+      const selected = document.getElementById('recipe-select').value;
+      document.getElementById('edit-recipe-btn').style.display = selected ? 'inline-block' : 'none';
+      document.getElementById('delete-recipe-btn').style.display = selected ? 'inline-block' : 'none';
+    }
+    document.getElementById('load-recipe-btn').onclick = () => {
+      const selected = document.getElementById('recipe-select').value;
+      if (!selected) return alert('レシピを選択してください。');
+      document.getElementById('items-container').innerHTML = '';
+      getStoredRecipes()[selected].forEach(item => addItemRow(item, '', ''));
+    };
+    document.getElementById('toggle-add-recipe-btn').onclick = () => {
+      document.getElementById('editing-recipe-name').value = '';
+      document.getElementById('recipe-title').value = '';
+      document.getElementById('recipe-ingredients').value = '';
+      document.getElementById('recipe-form').style.display = 'block';
+    };
+    document.getElementById('edit-recipe-btn').onclick = () => {
+      const selected = document.getElementById('recipe-select').value;
+      if (!selected) return;
+      const recipes = getStoredRecipes();
+      document.getElementById('editing-recipe-name').value = selected;
+      document.getElementById('recipe-title').value = selected;
+      document.getElementById('recipe-ingredients').value = recipes[selected].join(', ');
+      document.getElementById('recipe-form').style.display = 'block';
+    };
+    document.getElementById('delete-recipe-btn').onclick = () => {
+      const selected = document.getElementById('recipe-select').value;
+      if (!selected || !confirm(`レシピ「${selected}」を削除しますか？`)) return;
+      const recipes = getStoredRecipes(); delete recipes[selected];
+      saveRecipes(recipes); document.getElementById('recipe-select').value = '';
+      updateRecipeButtonsState();
+    };
+    document.getElementById('cancel-recipe-btn').onclick = () => document.getElementById('recipe-form').style.display = 'none';
+    document.getElementById('save-recipe-btn').onclick = () => {
+      const oldName = document.getElementById('editing-recipe-name').value;
+      const title = document.getElementById('recipe-title').value.trim();
+      const raw = document.getElementById('recipe-ingredients').value.trim();
+      if (!title || !raw) return alert('名称と具材を入力してください。');
+      const recipes = getStoredRecipes();
+      if (oldName && oldName !== title) delete recipes[oldName];
+      recipes[title] = raw.split(/[,、\s]+/).filter(i => i.length > 0);
+      saveRecipes(recipes);
+      document.getElementById('recipe-select').value = title;
+      document.getElementById('recipe-form').style.display = 'none';
+      updateRecipeButtonsState();
+    };
+
+    // --- 一括保存 ---
+    document.getElementById('save-all-btn').onclick = () => {
+      const date = dateInput.value;
+      if (!date) return alert('日付を選択してください。');
+      const history = getStoredHistory();
+      const resultsSummary = [];
+      let savedCount = 0;
+
+      document.querySelectorAll('.item-row').forEach(row => {
+        const rawName = row.querySelector('.name-input').value;
+        const category = row.querySelector('.cat-select').value;
+        const price = parseFloat(toHalfWidthAndClean(row.querySelector('.price-input').value));
+        const capacity = parseFloat(toHalfWidthAndClean(row.querySelector('.cap-input').value));
+
+        if (!rawName.trim() && isNaN(price) && isNaN(capacity)) return;
+        if (!rawName.trim() || isNaN(price) || isNaN(capacity) || capacity <= 0) {
+          return resultsSummary.push(`⚠️ 「${escapeHTML(rawName) || '未記入'}」: エラーによりスキップ`);
+        }
+
+        const normName = normalizeText(rawName.trim());
+        const uPrice = price / capacity;
+        const sames = history.filter(i => i.normalizedName === normName);
+        
+        resultsSummary.push(getPriceAnalysisText(rawName.trim(), normName, uPrice, sames));
+        history.push({ date, name: rawName.trim(), normalizedName: normName, category, price, capacity, unitPrice: uPrice });
+        savedCount++;
+      });
+
+      if (savedCount === 0) return alert('有効なデータがありません。');
+      localStorage.setItem('priceHistory', JSON.stringify(history));
+      
+      document.querySelector('.result-title').textContent = `${savedCount}件記録しました`;
+      document.getElementById('result-detail').innerHTML = resultsSummary.join('<br>');
+      document.getElementById('items-container').innerHTML = '';
+      addItemRow();
+      populateMonthFilterOptions();
+      refreshUI();
+    };
+
+    function getPriceAnalysisText(dName, nName, current, sames) {
+      const cleanName = getCleanProductName(dName);
+      if (!sames.length) {
+        return `<b>【${escapeHTML(cleanName)}】</b> 初記録 (単価: ${current.toFixed(2)}円) <span class="badge-bottom">🎉 底値！</span>`;
+      }
+      
+      const avg = sames.reduce((s, i) => s + i.unitPrice, 0) / sames.length;
+      const minPrice = Math.min(...sames.map(i => i.unitPrice));
+      const inflationRate = ((current - avg) / avg) * 100;
+      
+      let inflationBadge = inflationRate > 0 
+        ? `<span class="badge-inflation-up">📈 平均より +${inflationRate.toFixed(1)}% (値上げ)</span>`
+        : `<span class="badge-inflation-down">📉 平均より ${inflationRate.toFixed(1)}% (お得)</span>`;
+
+      let bottomBadge = current <= minPrice ? ` <span class="badge-bottom">🎉 過去最安値！</span>` : '';
+
+      return `<b>【${escapeHTML(cleanName)}】</b> 単価:${current.toFixed(2)}円 (${inflationBadge})${bottomBadge}`;
+    }
+
+    function updateDailyTotal() {
+      const date = dateInput.value;
+      const total = getStoredHistory().filter(i => i.date === date).reduce((s, i) => s + i.price, 0);
+      document.getElementById('daily-total-badge').textContent = `選択日: ${total.toLocaleString()} 円`;
+    }
+
+    function populateMonthFilterOptions() {
+      const history = getStoredHistory();
+      const select = document.getElementById('history-month-filter');
+      const currentValue = select.value;
+      const months = Array.from(new Set(history.map(i => i.date.slice(0, 7)))).sort().reverse();
+      select.innerHTML = '<option value="">全期間表示</option>' + months.map(m => `<option value="${m}">${m}</option>`).join('');
+      select.value = currentValue;
+    }
+
+    document.getElementById('history-month-filter').addEventListener('change', displayHierarchicalHistory);
+    document.getElementById('history-search-input').addEventListener('input', displayHierarchicalHistory);
+
+    // --- 日付の階層折りたたみ表示 ---
+    function displayHierarchicalHistory() {
+      const history = getStoredHistory();
+      const container = document.getElementById('history-hierarchical');
+      const monthFilter = document.getElementById('history-month-filter').value;
+      const searchQuery = document.getElementById('history-search-input').value.trim().toLowerCase();
+      const currentYM = new Date().toISOString().slice(0, 7);
+      const currentYear = new Date().toISOString().slice(0, 4);
+
+      let filtered = history;
+      if (monthFilter) filtered = filtered.filter(item => item.date.startsWith(monthFilter));
+      if (searchQuery) filtered = filtered.filter(item => item.name.toLowerCase().includes(searchQuery) || item.normalizedName.toLowerCase().includes(searchQuery));
+
+      const filterTotal = filtered.reduce((sum, item) => sum + item.price, 0);
+      document.getElementById('summary-filter-label').textContent = monthFilter ? `📅 ${monthFilter} の合計:` : '📊 表示データの合計:';
+      document.getElementById('summary-filter-stats').textContent = `${filterTotal.toLocaleString()} 円 (${filtered.length}件)`;
+
+      if (!filtered.length) {
+        container.innerHTML = '<p style="color:#777;text-align:center;padding:20px;">履歴はありません。</p>';
+        return;
+      }
+
+      const groups = {};
+      filtered.forEach(item => {
+        const itemYM = item.date.slice(0, 7);
+        const itemYear = item.date.slice(0, 4);
+        let key = item.date;
+
+        if (monthFilter) {
+          key = item.date;
+        } else if (itemYM !== currentYM) {
+          if (itemYear !== currentYear) {
+            key = `${itemYear}年 (年別)`;
+          } else {
+            key = `${itemYM}月 (月別)`;
+          }
+        }
+
+        const originalIndex = history.indexOf(item);
+        (groups[key] = groups[key] || []).push({ ...item, originalIndex });
+      });
+
+      container.innerHTML = Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(groupKey => {
+        const items = groups[groupKey];
+        const groupTotal = items.reduce((s,i)=>s+i.price,0);
+        
+        const rows = items.map(i => `
+          <tr>
+            <td><span class="history-item-name" onclick="openItemChartModal('${escapeHTML(i.normalizedName)}', '${escapeHTML(i.name)}')">${escapeHTML(i.name)}</span></td>
+            <td><span style="font-size:11px; background:#eee; padding:2px 4px; border-radius:3px;">${i.category||'食費'}</span></td>
+            <td>${i.price.toLocaleString()}円 (${i.capacity})</td>
+            <td>${i.unitPrice.toFixed(2)}</td>
+            <td>
+              <button class="action-btn btn-warning" onclick="openEditModal(${i.originalIndex})">編</button>
+              <button class="action-btn btn-danger" onclick="deleteRecord(${i.originalIndex})">削</button>
+            </td>
+          </tr>
+        `).join('');
+
+        return `
+          <div class="date-block">
+            <div class="date-header" onclick="toggleDateBlock(this)">
+              <span><span class="toggle-icon">▶</span> 📁 ${groupKey}</span>
+              <span>計: ${groupTotal.toLocaleString()}円 (${items.length}件)</span>
+            </div>
+            <div class="date-body" style="display: none;">
+              <table><thead><tr><th>品名 (タップで単価推移)</th><th>カテゴリ</th><th>価格(量)</th><th>単価</th><th>操作</th></tr></thead><tbody>${rows}</tbody></table>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function toggleDateBlock(headerEl) {
+      const bodyEl = headerEl.nextElementSibling;
+      const iconEl = headerEl.querySelector('.toggle-icon');
+      if (bodyEl.style.display === 'none') {
+        bodyEl.style.display = 'block'; iconEl.textContent = '▼';
+      } else {
+        bodyEl.style.display = 'none'; iconEl.textContent = '▶';
+      }
+    }
+
+    // --- 編集・削除 ---
+    function openEditModal(idx) {
+      const i = getStoredHistory()[idx];
+      document.getElementById('edit-target-index').value = idx;
+      document.getElementById('edit-date').value = i.date;
+      document.getElementById('edit-name').value = i.name;
+      document.getElementById('edit-cat').value = i.category || '食費';
+      document.getElementById('edit-price').value = i.price;
+      document.getElementById('edit-capacity').value = i.capacity;
+      document.getElementById('edit-modal').style.display = 'flex';
+    }
+    document.getElementById('update-record-btn').onclick = () => {
+      const idx = document.getElementById('edit-target-index').value;
+      const h = getStoredHistory();
+      const name = document.getElementById('edit-name').value.trim();
+      const category = document.getElementById('edit-cat').value;
+      const price = parseFloat(toHalfWidthAndClean(document.getElementById('edit-price').value));
+      const cap = parseFloat(toHalfWidthAndClean(document.getElementById('edit-capacity').value));
+      if (!name || isNaN(price) || isNaN(cap)) return alert('正しく入力してください。');
+      
+      h[idx] = { date: document.getElementById('edit-date').value, name, normalizedName: normalizeText(name), category, price, capacity: cap, unitPrice: price/cap };
+      localStorage.setItem('priceHistory', JSON.stringify(h));
+      document.getElementById('edit-modal').style.display = 'none';
+      populateMonthFilterOptions();
+      refreshUI();
+    };
+    document.querySelectorAll('.close-btn, #cancel-edit-btn').forEach(b => b.onclick = (e) => e.target.closest('.modal').style.display = 'none');
+    function deleteRecord(idx) {
+      if (!confirm('削除しますか？')) return;
+      const h = getStoredHistory(); h.splice(idx, 1);
+      localStorage.setItem('priceHistory', JSON.stringify(h));
+      populateMonthFilterOptions();
+      refreshUI();
+    }
+
+    // --- グラフ表示（月別支出［期間指定・月平均ライン付き］ ＆ 商品単価推移） ---
+    function openTotalExpenseGraphModal(targetYM = null, periodFilter = 'all') {
+      const history = getStoredHistory();
+      if (chartInstance) chartInstance.destroy();
+
+      const headerContainer = document.getElementById('graph-modal-header');
+      headerContainer.innerHTML = '';
+      document.getElementById('graph-filter-container').style.display = 'none';
+      document.getElementById('graph-legend-info').textContent = '';
+
+      if (targetYM) {
+        // 円グラフ（特定月内訳）
+        document.getElementById('graph-modal-title').textContent = `🍰 ${targetYM} のカテゴリ別内訳`;
+        const backBtn = document.createElement('button');
+        backBtn.className = 'btn btn-outline';
+        backBtn.style.marginBottom = '8px';
+        backBtn.textContent = '◀ 月別トータルに戻る';
+        backBtn.onclick = () => openTotalExpenseGraphModal(null, periodFilter);
+        headerContainer.appendChild(backBtn);
+
+        const monthItems = history.filter(i => i.date.startsWith(targetYM));
+        const catTotals = { '食費': 0, '日用品': 0, 'その他': 0 };
+        monthItems.forEach(i => {
+          const c = i.category || '食費';
+          catTotals[c] = (catTotals[c] || 0) + i.price;
+        });
+
+        chartInstance = new Chart(document.getElementById('price-chart'), {
+          type: 'pie',
+          data: {
+            labels: Object.keys(catTotals),
+            datasets: [{
+              data: Object.values(catTotals),
+              backgroundColor: ['#2ecc71', '#3498db', '#f39c12']
+            }]
+          },
+          options: { responsive: true }
+        });
+
+      } else {
+        // 棒グラフ（月別支出推移）＋期間指定＆月平均ライン
+        document.getElementById('graph-modal-title').textContent = '📊 月別トータル支出推移 (月タップで内訳表示)';
+        
+        let monthlyTotal = {};
+        history.forEach(i => {
+          const ym = i.date.slice(0, 7);
+          monthlyTotal[ym] = (monthlyTotal[ym] || 0) + i.price;
+        });
+
+        let labels = Object.keys(monthlyTotal).sort();
+
+        // 期間フィルターの適用
+        const now = new Date();
+        if (periodFilter === '3m') {
+          const d = new Date(); d.setMonth(now.getMonth() - 3);
+          const limitStr = d.toISOString().slice(0, 7);
+          labels = labels.filter(ym => ym >= limitStr);
+        } else if (periodFilter === '6m') {
+          const d = new Date(); d.setMonth(now.getMonth() - 6);
+          const limitStr = d.toISOString().slice(0, 7);
+          labels = labels.filter(ym => ym >= limitStr);
+        } else if (periodFilter === '1y') {
+          const d = new Date(); d.setFullYear(now.getFullYear() - 1);
+          const limitStr = d.toISOString().slice(0, 7);
+          labels = labels.filter(ym => ym >= limitStr);
+        }
+
+        setupTotalExpenseFilterUI(periodFilter);
+
+        if (!labels.length) {
+          document.getElementById('graph-legend-info').textContent = '指定された期間内のデータはありません。';
+          document.getElementById('graph-modal').style.display = 'flex';
+          return;
+        }
+
+        const dataValues = labels.map(ym => monthlyTotal[ym]);
+        
+        // 【要件対応】期間内の月平均支出を計算して水平線用にマッピング
+        const totalSum = dataValues.reduce((s, v) => s + v, 0);
+        const overallMonthlyAvg = totalSum / dataValues.length;
+        const avgLineData = labels.map(() => overallMonthlyAvg);
+
+        chartInstance = new Chart(document.getElementById('price-chart'), {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: '月別支出合計 (円)',
+                data: dataValues,
+                backgroundColor: 'rgba(52, 152, 219, 0.6)',
+                borderColor: '#3498db',
+                borderWidth: 1,
+                order: 2
+              },
+              {
+                label: `期間平均 (${Math.round(overallMonthlyAvg).toLocaleString()}円)`,
+                data: avgLineData,
+                type: 'line',
+                borderColor: '#e74c3c',
+                borderDash: [5, 5],
+                pointRadius: 0,
+                fill: false,
+                order: 1
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            onClick: (e, elements) => {
+              if (elements.length > 0) {
+                const index = elements[0].index;
+                openTotalExpenseGraphModal(labels[index], periodFilter);
+              }
+            },
+            scales: { y: { title: { display: true, text: '円' } } }
+          }
+        });
+
+        document.getElementById('graph-legend-info').innerHTML = `💡 <b>期間中の月平均支出: ${Math.round(overallMonthlyAvg).toLocaleString()} 円</b> （棒グラフをタップすると内訳が見られます）`;
+      }
+
+      document.getElementById('graph-modal').style.display = 'flex';
+    }
+
+    function setupTotalExpenseFilterUI(currentPeriod) {
+      const container = document.getElementById('graph-filter-container');
+      container.style.display = 'block';
+      container.innerHTML = `
+        <div class="row-flex" style="font-size: 12px; align-items: center; gap: 5px;">
+          <span>期間絞り込み:</span>
+          <select id="total-graph-period-select" onchange="changeTotalChartPeriod(this.value)" style="padding: 4px; font-size: 12px;">
+            <option value="all" ${currentPeriod==='all'?'selected':''}>全期間</option>
+            <option value="3m" ${currentPeriod==='3m'?'selected':''}>直近3ヶ月</option>
+            <option value="6m" ${currentPeriod==='6m'?'selected':''}>直近6ヶ月</option>
+            <option value="1y" ${currentPeriod==='1y'?'selected':''}>直近1年</option>
+          </select>
+        </div>
+      `;
+    }
+
+    function changeTotalChartPeriod(period) {
+      openTotalExpenseGraphModal(null, period);
+    }
+
+    function openItemChartModal(normName, displayName, periodFilter = 'all') {
+      currentGraphNormName = normName;
+      currentGraphDisplayName = displayName;
+
+      const history = getStoredHistory();
+      let filtered = history.filter(i => i.normalizedName === normName).sort((a,b) => a.date.localeCompare(b.date));
+
+      if (!filtered.length) return alert('該当データの履歴がありません。');
+
+      const now = new Date();
+      if (periodFilter === '3m') {
+        const d = new Date(); d.setMonth(now.getMonth() - 3);
+        filtered = filtered.filter(i => new Date(i.date) >= d);
+      } else if (periodFilter === '6m') {
+        const d = new Date(); d.setMonth(now.getMonth() - 6);
+        filtered = filtered.filter(i => new Date(i.date) >= d);
+      } else if (periodFilter === '1y') {
+        const d = new Date(); d.setFullYear(now.getFullYear() - 1);
+        filtered = filtered.filter(i => new Date(i.date) >= d);
+      }
+
+      if (!filtered.length) {
+        if (chartInstance) chartInstance.destroy();
+        document.getElementById('graph-modal-header').innerHTML = '';
+        document.getElementById('graph-modal-title').textContent = `📈 「${getCleanProductName(displayName)}」の単価推移`;
+        setupItemChartFilterUI(periodFilter);
+        document.getElementById('graph-legend-info').textContent = '指定された期間内のデータはありません。';
+        document.getElementById('graph-modal').style.display = 'flex';
+        return;
+      }
+
+      const dateMap = {};
+      filtered.forEach(i => {
+        if (!dateMap[i.date]) dateMap[i.date] = [];
+        dateMap[i.date].push(i.unitPrice);
+      });
+
+      const dates = Object.keys(dateMap).sort();
+      const avgUnitPrices = dates.map(d => {
+        const prices = dateMap[d];
+        return prices.reduce((s, p) => s + p, 0) / prices.length;
+      });
+
+      const totalSum = avgUnitPrices.reduce((s, p) => s + p, 0);
+      const overallAvg = totalSum / avgUnitPrices.length;
+
+      if (chartInstance) chartInstance.destroy();
+
+      document.getElementById('graph-modal-header').innerHTML = '';
+      document.getElementById('graph-modal-title').textContent = `📈 「${getCleanProductName(displayName)}」の単価推移`;
+      
+      setupItemChartFilterUI(periodFilter);
+
+      const overallAvgData = dates.map(() => overallAvg);
+
+      chartInstance = new Chart(document.getElementById('price-chart'), {
+        type: 'line',
+        data: {
+          labels: dates,
+          datasets: [
+            {
+              label: '日別平均単価 (円)',
+              data: avgUnitPrices,
+              borderColor: '#e74c3c',
+              backgroundColor: 'rgba(231, 76, 60, 0.1)',
+              fill: true,
+              tension: 0.1
+            },
+            {
+              label: `期間平均 (${overallAvg.toFixed(2)}円)`,
+              data: overallAvgData,
+              borderColor: '#3498db',
+              borderDash: [5, 5],
+              pointRadius: 0,
+              fill: false
+            }
+          ]
+        },
+        options: { 
+          responsive: true, 
+          scales: { y: { title: { display: true, text: '円 / 単位' } } } 
+        }
+      });
+
+      document.getElementById('graph-legend-info').innerHTML = `💡 <b>期間平均単価: ${overallAvg.toFixed(2)} 円</b> （同日の複数購入は平均化されています）`;
+      document.getElementById('graph-modal').style.display = 'flex';
+    }
+
+    function setupItemChartFilterUI(currentPeriod) {
+      const container = document.getElementById('graph-filter-container');
+      container.style.display = 'block';
+      container.innerHTML = `
+        <div class="row-flex" style="font-size: 12px; align-items: center; gap: 5px;">
+          <span>期間絞り込み:</span>
+          <select id="item-graph-period-select" onchange="changeItemChartPeriod(this.value)" style="padding: 4px; font-size: 12px;">
+            <option value="all" ${currentPeriod==='all'?'selected':''}>全期間</option>
+            <option value="3m" ${currentPeriod==='3m'?'selected':''}>直近3ヶ月</option>
+            <option value="6m" ${currentPeriod==='6m'?'selected':''}>直近6ヶ月</option>
+            <option value="1y" ${currentPeriod==='1y'?'selected':''}>直近1年</option>
+          </select>
+        </div>
+      `;
+    }
+
+    function changeItemChartPeriod(period) {
+      openItemChartModal(currentGraphNormName, currentGraphDisplayName, period);
+    }
+
+    // --- バックアップ ＆ CSV出力 ---
+    document.getElementById('export-data-btn').onclick = () => {
+      const data = { history: getStoredHistory(), recipes: getStoredRecipes(), favorites: getStoredFavorites() };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `sokone_backup_${new Date().toISOString().slice(0,10)}.json`; a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    document.getElementById('export-csv-btn').onclick = () => {
+      const history = getStoredHistory();
+      if (!history.length) return alert('エクスポートするデータがありません。');
+      let csv = '\uFEFF日付,品名,カテゴリ,価格(円),内容量,単価\n';
+      history.forEach(i => {
+        csv += `"${i.date}","${i.name.replace(/"/g, '""')}","${i.category||'食費'}",${i.price},${i.capacity},${i.unitPrice}\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `sokone_data_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    document.getElementById('import-data-file').onchange = (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (data.history) localStorage.setItem('priceHistory', JSON.stringify(data.history));
+          if (data.recipes) localStorage.setItem('customRecipes', JSON.stringify(data.recipes));
+          if (data.favorites) localStorage.setItem('favoriteItems', JSON.stringify(data.favorites));
+          alert('復元完了しました！'); initApp();
+        } catch(err) { alert('読み込みエラー'); }
+      };
+      reader.readAsText(file); e.target.value = '';
+    };
+
+    document.getElementById('clear-all-data-btn').onclick = () => {
+      if (confirm('すべてのデータを消去しますか？')) { localStorage.clear(); alert('初期化しました。'); initApp(); }
+    };
+
+    function getStoredHistory() {
+      let h = JSON.parse(localStorage.getItem('priceHistory') || '[]');
+      let updated = false;
+      h.forEach(i => {
+        if(!i.normalizedName){ i.normalizedName = normalizeText(i.name); updated = true; }
+        if(!i.category){ i.category = '食費'; updated = true; }
+      });
+      if(updated) localStorage.setItem('priceHistory', JSON.stringify(h));
+      return h;
+    }
+
+    function getCleanProductName(s) { 
+      if (!s) return '';
+      let cleaned = s.replace(/[\(（].*?[\)）]/g, '');
+      return cleaned.trim();
+    }
+
+    function normalizeText(s) {
+      s = getCleanProductName(s);
+      const k = {'ｶﾞ':'ガ','ｷﾞ':'ギ','ｸﾞ':'グ','ｹﾞ':'ゲ','ｺﾞ':'ゴ','ﾀﾞ':'ダ','ﾃﾞ':'デ','ﾄﾞ':'ド','ﾊﾞ':'バ','ﾋﾞ':'ビ','ﾌﾞ':'ブ','ﾍﾞ':'ベ','ﾎﾞ':'ボ','ﾊﾟ':'パ','ﾋﾟ':'ピ','ﾌﾟ':'プ','ﾍﾟ':'ペ','ﾎﾟ':'ポ','ｱ':'ア','ｲ':'イ','ｳ':'ウ','ｴ':'エ','ｵ':'オ','ｶ':'カ','ｷ':'キ','ｸ':'ｸ','ｹﾞ':'ゲ','ｺﾞ':'ゴ','ｻ':'サ','ｼ':'シ','ｽ':'ｽ','ｾ':'セ','ｿ':'ソ','ﾀ':'タ','ﾁ':'チ','ﾂ':'ツ','ﾅ':'ナ','ﾆ':'ニ','ﾇ':'ヌ','ﾈ':'ネ','ﾉ':'ノ','ﾊ':'ハ','ﾋ':'ヒ','ﾌ':'フ','ﾍ':'ヘ','ﾎ':'ホ','ﾏ':'マ','ﾐ':'ミ','ﾑ':'ム','ﾒ':'メ','ﾓ':'ﾓ','ﾔ':'ヤ','ﾕ':'ユ','ﾖ':'ヨ','ﾗ':'ラ','ﾘ':'リ','ﾙ':'ル','ﾚ':'レ','ﾛ':'ロ','ﾜ':'ワ','ｦ':'ヲ','ﾝ':'ン','ｧ':'ァ','ｨ':'ィ','ｩ':'ゥ','ｪ':'ェ','ｫ':'ォ','ｯ':'ッ','ｬ':'ャ','ｭ':'ュ','ｮ':'ョ','ｰ':'ー'};
+      s = s.replace(new RegExp(Object.keys(k).join('|'), 'g'), m => k[m]);
+      return s.replace(/[ぁ-ん]/g, m => String.fromCharCode(m.charCodeAt(0) + 0x60));
+    }
+    function toHalfWidthAndClean(s) { return String(s||'').replace(/,/g, '').replace(/[０-９．]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xfee0)); }
+    function escapeHTML(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+    initApp();
+  </script>
+</body>
+</html>

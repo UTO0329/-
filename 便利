@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>底値判定ツール</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>底値判定ツール</h1>
+    
+    <div class="comparison-grid">
+      <div class="product-card" id="card-a">
+        <h2>商品 A</h2>
+        <label>価格 (円)
+          <input type="number" id="price-a" placeholder="例: 300">
+        </label>
+        <label>内容量 (g/ml/個)
+          <input type="number" id="capacity-a" placeholder="例: 150">
+        </label>
+        <p class="unit-price">1単位あたり: <span id="unit-price-a">-</span> 円</p>
+      </div>
+
+      <div class="product-card" id="card-b">
+        <h2>商品 B</h2>
+        <label>価格 (円)
+          <input type="number" id="price-b" placeholder="例: 500">
+        </label>
+        <label>内容量 (g/ml/個)
+          <input type="number" id="capacity-b" placeholder="例: 300">
+        </label>
+        <p class="unit-price">1単位あたり: <span id="unit-price-b">-</span> 円</p>
+      </div>
+    </div>
+
+    <button id="calc-btn">どちらがお得か判定！</button>
+    <div id="result" class="result-area">数値を入力して判定ボタンを押してください</div>
+  </div>
+// 判定ボタンを取得してクリックイベントを監視
+document.getElementById('calc-btn').addEventListener('click', function() {
+  
+  // ★この1行を追加して保存（Cmd + S）してください
+  console.log('ボタンが押されました！');
+
+  // 1. 各入力欄から文字列の値を取り出し、数値(float)に変換する
+  const priceA = parseFloat(document.getElementById('price-a').value);
+  // ...（以下そのまま）
+  <script src="script.js"></script>
+</body>
+</html>

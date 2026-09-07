@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>CS対応効率化ポータル - 登録情報変更</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 650px; background-color: #f8f9fa; }
+        .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h2 { font-size: 18px; margin-top: 0; color: #333; }
+        
+        .form-group { margin-bottom: 15px; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; }
+        textarea { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; height: 120px; }
+        
+        /* サービス選択チェックボックス */
+        .checkbox-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px; }
+        .checkbox-item { background: #e9ecef; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 14px; }
+        .checkbox-item input { margin-right: 5px; }
+
+        .btn-generate { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; font-weight: bold; }
+        .btn-generate:hover { background: #0056b3; }
+        .btn-copy { margin-top: 10px; padding: 8px 15px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <h1>CS対応効率化ポータル</h1>
+
+    <div class="card">
+        <h2>1. 対象サービスの選択（複数選択可） ＆ メール貼り付け</h2>
+        
+        <div class="form-group">
+            <label>対象サービス（レ点チェック）</label>
+            <div class="checkbox-group">
+                <label class="checkbox-item"><input type="checkbox" value="サービスA" class="service-item">サービスA</label>
+                <label class="checkbox-item"><input type="checkbox" value="サービスB" class="service-item">サービスB</label>
+                <label class="checkbox-item"><input type="checkbox" value="サービスC" class="service-item">サービスC</label>
+                <label class="checkbox-item"><input type="checkbox" value="サービスD" class="service-item">サービスD</label>
+                <label class="checkbox-item"><input type="checkbox" value="サービスE" class="service-item">サービスE</label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>受信したお問い合わせ本文</label>
+            <textarea id="originalMessage" placeholder="ここに受信したフォーム文面をそのまま貼り付け..."></textarea>
+        </div>
+
+        <button class="btn-generate" onclick="generateReply()">解析して返信文を作成する</button>
+    </div>
+
+    <div class="card">
+        <h2>2. 生成された返信メール</h2>
+        <textarea id="outputEmail" style="height: 320px;"></textarea>
+        <button class="btn-copy" onclick="copyToClipboard()">1クリックで全文コピー</button>
+    </div>
+
+    <script>
+        // ★各サービスの確認案内文（実際の業務文面に書き換えて使えます）
+        const serviceGuides = {
+            "サービスA": "【サービスA】マイページ（設定 > 会員情報）よりご確認いただけます。",
+            "サービスB": "【サービスB】公式アプリ内の「アカウント設定」画面よりご確認いただけます。",
+            "サービスC": "【サービスC】次回お届け分の納品書に印字される内容にてご確認いただけます。",
+            "サービスD": "【サービスD】Webポータルのプロフィール画面よりご確認いただけます。",
+            "サービスE": "【サービスE】別途お送りする変更完了通知メールにてご確認いただけます。"
+        };
+
+        function generateReply() {
+            // 1. チェックされたサービスをすべて取得し、案内文を配列に格納
+            const checkedServices = document.querySelectorAll('.service-item:checked');
+            let guideLines = [];
+
+            checkedServices.forEach(function(box) {
+                const serviceName = box.value;
+                if (serviceGuides[serviceName]) {
+                    guideLines.push(serviceGuides[serviceName]);
+                }
+            });
+
+            // チェックされたサービスがある場合のみ「■変更後の情報確認方法」の見出しをつけて結合
+            let combinedGuide = "";
+            if (guideLines.length > 0) {
+                combinedGuide = "■変更後の情報確認方法\n" + guideLines.join('\n');
+            }
+
+            // 2. テキスト解析（変更項目の抽出と個人情報クレンジング）
+            const rawText = document.getElementById('originalMessage').value;
+            const lines = rawText.split('\n');
+            let detectedItems = [];
+            let cleanedQuoteLines = [];
+
+            lines.forEach(function(line) {
+                const trimmed = line.trim();
+                const match = trimmed.match(/^\[(.*?)\](.*)$/);
+
+                if (match) {
+                    const itemKey = match[1];
+
+                    if (itemKey.includes('の変更')) {
+                        cleanedQuoteLines.push(`[${itemKey}]`);
+                        const itemName = itemKey.replace('の変更', '');
+                        detectedItems.push(itemName);
+                    }
+                } else {
+                    if (trimmed !== '') {
+                        cleanedQuoteLines.push(line);
+                    }
+                }
+            });
+
+            // 3. 変更項目の整形（例：住所・メールアドレス）
+            const itemsText = detectedItems.length > 0 
+                ? detectedItems.join('・') 
+                : 'ご依頼の登録情報';
+
+            // 4. クレンジング後の引用文
+            const cleanedQuote = cleanedQuoteLines.join('\n');
+
+            // 5. テンプレート文章に組み立て
+            const replyText = 
+`お客様
+
+登録情報の変更のご連絡をいただき有難うございます
+
+${itemsText}の変更が完了いたしました。
+
+${combinedGuide}
+
+----------------------------------------
+-------------original message------------
+${cleanedQuote}`;
+
+            document.getElementById('outputEmail').value = replyText;
+        }
+
+        function copyToClipboard() {
+            const outputText = document.getElementById('outputEmail');
+            outputText.select();
+            navigator.clipboard.writeText(outputText.value);
+            alert('返信文をコピーしました！');
+        }
+    </script>
+</body>
+</html>
